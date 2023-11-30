@@ -1,0 +1,68 @@
+
+p.title {
+    font-size: 50px;
+    font-weight: bold;
+    color: #000000;
+    text-align: center;
+}
+
+div.trainbox {
+    xwidth: 100%;
+    xheight: 100%;
+    background-color: #ffffff;
+    border-radius: 10px;
+    border: 1px solid #000000;
+    padding: 10px;
+    float: left;
+    position: relative;
+}
+div.imgflip {
+	width:156px;
+	height:156px;
+	position:relative;
+}
+img.sample {
+    border-radius: 10px;
+    border: 3px solid transparent;
+    position:absolute;
+    top:0;
+    left:0;
+}
+img.sampgif
+{
+    border-radius: 10px;
+    border: 3px solid transparent;
+    position:absolute;
+    top:0;
+    left:0;
+}
+
+img.sample:hover {
+	z-index:0 !important;
+	border: 3px solid transparent;
+}
+
+img.sampgif:hover {
+	z-index:1 !important;
+}
+
+
+@keyframes ants { to { background-position: 100% 100% } }
+
+img.sampgif:hover {
+	border: 3px solid transparent;
+	background: linear-gradient(white, white) padding-box,
+	            repeating-linear-gradient(-45deg, black 0, black 25%, transparent 0, transparent 50%) 0 / .6em .6em;
+	animation: ants 12s linear infinite;
+	
+}
+
+
+
+
+
+@include marching-ants-v2-animation(20px, 1);
+@include marching-ants-v2-animation(20px, 2);
+@include marching-ants-v2-animation(20px, 3);
+
+

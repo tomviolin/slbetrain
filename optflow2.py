@@ -7,6 +7,26 @@ import cv2 as cv
 import numpy as np 
 import os, sys
 
+import sqlite3
+import time
+import datetime
+
+conn = sqlite3.connect('samples.sqlite3')
+conn.execute('''CREATE TABLE IF NOT EXISTS samples
+        (sourcemedia_base char(32), 
+        frame_no int,
+        contour_id int,
+        user_category int,
+        user_entered TIMESTAMP,
+        x int,
+        y int,
+        w int,
+        h int,
+        image blob,
+        PRIMARY KEY (sourcemedia_base, frame_no, contour_id)
+        )''')
+
+
 # establish structuring element for dilation
 kernel9 = cv.getStructuringElement(cv.MORPH_ELLIPSE,(9,9))
 kernel3 = cv.getStructuringElement(cv.MORPH_ELLIPSE,(3,3))
@@ -16,14 +36,15 @@ kernel5 = cv.getStructuringElement(cv.MORPH_ELLIPSE,(5,5))
 # The video feed is read in as 
 # a VideoCapture object 
 if len(sys.argv) > 1:
-    cap = cv.VideoCapture(sys.argv[1])
-    base = os.path.basename(sys.argv[1])
-    base = base.split(".")[0]
-    savepath = f"trains/{base}"
-    sys.argv.pop(1) # remove the first argument
+    farg = sys.argv[1]
 else:
-    cap = cv.VideoCapture("SLBE_20230904_095801.mp4")
-    savepath = "trains/SLBE_20230904_095801"
+    farg = "SLBE_20230904_095801.mp4"
+
+cap = cv.VideoCapture(sys.argv[1])
+base = os.path.basename(sys.argv[1])
+base = base.split(".")[0]
+savepath = f"trains/{base}"
+sys.argv.pop(1) # remove the first argument
 
 # ret = a boolean return value from 
 # getting the frame, first_frame = the 
@@ -73,6 +94,7 @@ while(cap.isOpened()) and i<framelimit:
     ret, this_frame = cap.read() 
     if ret==False:
         break
+    orgframe = this_frame.copy()
     # convert the first frame to grayscale 
     gray = cv.cvtColor(cv.UMat(this_frame), cv.COLOR_BGR2GRAY) 
     
@@ -104,12 +126,6 @@ while(cap.isOpened()) and i<framelimit:
     mask0 = cv.divide(mask0, np.pi * 2)
     mask2 = cv.UMat(magnitude)
     graymask = mask2 
-    #orggraymask = graymask.copy()
-    #if lastgraymask is not None:
-    #    graymask[lastgraymask == 0] = 0
-    #lastgraymask = orggraymask
-    #print(f"max {cv.max(graymask)} min {cv.min(graymask)} mean {cv.mean(graymask)}", end='')
-    #graymask = cv.threshold(graymask, np.quantile(graymask,0.99), 255, cv.THRESH_BINARY)[1]
     grayasmk = cv.GaussianBlur(graymask, (15,15), 0)
     graymask = cv.normalize(graymask, None, 0, 255, cv.NORM_MINMAX, cv.CV_8UC1)
     graymask = cv.threshold(graymask, 160, 255, cv.THRESH_BINARY)[1]
@@ -119,11 +135,6 @@ while(cap.isOpened()) and i<framelimit:
         graymask = cv.erode(graymask, kernel9, iterations=2)
     graymaskafter = cv.add(graymask,0)
     graymask1 = cv.add(graymask,0)
-    #if lastgraymask is not None:
-    #    graymask1[lastgraymask==0] = 0
-    lastgraymask = cv.add(graymask,0)
-
-    #graymask2 = cv.dilate(graymask1, kernel5, iterations=1)
 
     conts, heirarchy = cv.findContours(graymask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
     #print(len(conts))
@@ -138,7 +149,21 @@ while(cap.isOpened()) and i<framelimit:
 
     for j in range(len(conts)):
         cont = conts[j]
+
+        if lastgraymask is not None:
+            blank = np.zeros_like(graymask.get()).astype(np.uint8)
+            cv.drawContours(blank, [cont.get()], -1, 1, cv.FILLED)
+            pixelcount = cv.countNonZero(blank)
+            lgm = lastgraymask.get()
+            lgm[lgm>0] = 1
+            blank = blank * lgm
+            pixelcountafter = cv.countNonZero(blank)
+            print(f"{pixelcountafter}:{pixelcount}")
+            if pixelcountafter < pixelcount * .5:
+                continue
+
         x,y,w,h = cv.boundingRect(cont)
+        blob = orgframe[y:y+h,x:x+w].copy()
         area = cv.contourArea(cont)
         rectarea = w*h
         if area <500:
@@ -239,7 +264,16 @@ while(cap.isOpened()) and i<framelimit:
         cv.imwrite(f"{jpgdir}/sfr{i:04d}_c{j:04d}_sf2.jpg", subframe2)
 
         os.system(f'cat {jpgdir}/sfr{i:04d}_c{j:04d}_sf*.jpg {jpgdir}/sfr{i:04d}_c{j:04d}_sf2.jpg | ffmpeg -v 0 -y -f jpeg_pipe -r 2 -i -  -vf "scale=iw:ih,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse"     {contsdir}/sfr{i:04d}_c{j:04d}_sfs.gif')
-        
+        # create sqlite record
+        cv.imwrite(f"{contsdir}/sfr{i:04d}_c{j:04d}_sfBLOB.jpg", blob)
+        blob = open(f"{contsdir}/sfr{i:04d}_c{j:04d}_sfBLOB.jpg", 'rb').read()
+        c = conn.cursor()
+        c.execute("INSERT INTO samples (sourcemedia_base, frame_no, contour_id, user_category, user_entered, x,y,w,h, image) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                (base,i,j,None,None, x,y,w,h, blob))
+        conn.commit()
+
+
+
     plt.close('all')
     plt.hist(areas) # bins=100)
     plt.savefig(f"{jpgdir}/hist{i:04d}.jpg")
@@ -256,7 +290,7 @@ while(cap.isOpened()) and i<framelimit:
     prv2_frame = prev_frame.copy()
     prev_frame = this_frame.copy()
 
-
+    lastgraymask = cv.add(graymask,0)
 
     print(f"frame {i:04d}", end='\r')
     # Frames are read by intervals of 1 millisecond. The 

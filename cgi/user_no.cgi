@@ -7,8 +7,6 @@ import sys
 import time
 import datetime
 import glob
-import sqlite3
-from pandasql import sqldf
 
 cgitb.enable()
 
@@ -19,9 +17,12 @@ giflist= sorted(glob.glob('/home/tomh/slbetrain/trains/*/conts/*.gif'))
 
 gifpaths= [ '/'.join(x.split('/')[-3:]) for x in giflist]
 
-dfs = [sqldf("select * from df where gifpath like '%s'" % x) for x in gifpaths]
+flagpaths = [('/'.join(x.split('/')[-3:])).replace('.gif','.flg') for x in giflist]
 
-merged = list(zip(gifpaths, category)
+flagsexist = [os.path.isfile('../'+x) for x in flagpaths]
+
+
+merged = list(zip(gifpaths,flagpaths,flagsexist))
 
 
 outj = json.dumps(merged)

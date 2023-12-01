@@ -10,9 +10,9 @@ div.trainbox {
     xwidth: 100%;
     xheight: 100%;
     background-color: #ffffff;
-    border-radius: 10px;
-    border: 1px solid #000000;
-    padding: 10px;
+    border-radius: 5px;
+    xborder: 1px solid #000000;
+    xpadding: 10px;
     float: left;
     position: relative;
 }
@@ -22,7 +22,7 @@ div.imgflip {
 	position:relative;
 }
 img.sample {
-    border-radius: 10px;
+    border-radius: 5px;
     border: 3px solid transparent;
     position:absolute;
     top:0;
@@ -30,7 +30,7 @@ img.sample {
 }
 img.sampgif
 {
-    border-radius: 10px;
+    border-radius: 5px;
     border: 3px solid transparent;
     position:absolute;
     top:0;

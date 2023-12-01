@@ -7,4 +7,5 @@ junk
 junk/*
 venv
 venv/*
-
+__*__
+*.sqlite3

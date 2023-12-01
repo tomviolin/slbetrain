@@ -16,7 +16,7 @@
 				jdi = jdata[i][0]+'';
 				hiresjpg = jdi.replace(".gif",".jpg").replace("conts","jpg").replace("_sfs","_sf2");
 				d.innerHTML=('<div class="imgflip"><img style="z-index:1" class="flipper sample" src="/slbetrain/trains/'+hiresjpg+'">'
-								+ '<img style="z-index:0" class="flipper sampgif" src="/slbetrain/trains/'+jdata[i][0]+'"></div><br>'
+								+ '<img style="z-index:0" class="flipper sampgif" src="/slbetrain/trains/'+jdata[i][0]+'"></div>'
 					+'<div class="btstrip">'
 						+'<button class="train yes" style="float:left" data-train="'+jdata[i][1]+'">YES</button>'
 						+'<button class="train no" style="float:right" data-train="'+jdata[i][1]+'">NO</button>'

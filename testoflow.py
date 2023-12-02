@@ -11,23 +11,24 @@ bakg = cv2.GaussianBlur(bakg,(5,5),0)
 # smaller noise patch
 
 block = np.random.randint(0,255,(50,50),dtype=np.uint8)
-block = cv2.GaussianBlur(block,(5,5),0)
+#block = cv2.GaussianBlur(block,(5,5),0)
 
 lastgray = None
 
 x = 150
-y = 150
-u = 5
+y = 103
+u = 6
 v = 5
 while True:
     # create scene
     fig = bakg.copy()
-    fig[y-25:y+25,x-25:x+25] = block
+    fig[int(y)-25:int(y)+25,int(x)-25:int(x)+25] = block
     cv2.imshow('fig',fig)
     if lastgray is not None:
-        oflow = cv2.calcOpticalFlowFarneback(lastgray,fig,None,0.5,3,15,9,5,1.2,0)
+        oflow = cv2.calcOpticalFlowFarneback(cv2.UMat(lastgray),cv2.UMat(fig),None,0.5,3,15,99,5,1.2,0).get()
         mag, ang = cv2.cartToPolar(oflow[...,0], oflow[...,1])
         hsv = np.zeros_like(fig)
+        mag[int(y)-25:int(y)+25,int(x)-25:int(x)+25] = 0
         cv2.imshow('mag',mag)
     lastgray = fig.copy()
     x += u
@@ -40,5 +41,6 @@ while True:
         y += v
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
+    v=v+0.01
 
 cv2.destroyAllWindows()

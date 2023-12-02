@@ -46,27 +46,20 @@ base = base.split(".")[0]
 savepath = f"trains/{base}"
 sys.argv.pop(1) # remove the first argument
 
+
+raw_frames = []
+gray_frames = []
+
 # ret = a boolean return value from 
 # getting the frame, first_frame = the 
 # first frame in the entire video sequence 
-ret, first_frame = cap.read() 
-#first_frame = first_frame[600:,:,:]
-# Converts frame to grayscale because we 
-# only need the luminance channel for 
-# detecting edges - less computationally 
-# expensive 
-prev_gray = cv.cvtColor(cv.UMat(first_frame), cv.COLOR_BGR2GRAY) 
+while len(raw_frames) < 3:
+    ret, inframe = cap.read() 
+    if ret==False:
+        break
+    raw_frames.append(cv.UMat(inframe))
+    gray_frames.append(cv.cvtColor(cv.UMat(inframe), cv.COLOR_BGR2GRAY))
 
-prev_frame = first_frame.copy()
-prv2_frame = first_frame.copy()
-
-# Creates an image filled with zero 
-# intensities with the same dimensions 
-# as the frame 
-mask = np.zeros_like(first_frame) 
-
-# Sets image saturation to maximum 
-mask[..., 1] = 255
 i=0
 os.system(f"rm -rf {savepath}")
 os.makedirs(savepath, exist_ok=True)
@@ -76,49 +69,24 @@ os.makedirs(jpgdir, exist_ok=True)
 os.makedirs(mp4dir, exist_ok=True)
 contsdir = f"{savepath}/conts"
 os.makedirs(contsdir, exist_ok=True)
-flowmeanx=[]
-flowmeany=[]
-prev_flow = None
-klast_flow = None
-flowflags = 0
-lastgraymask = None
-lastlastgraymask = None
-framelimit = 120
-if len(sys.argv) > 1:
-    framelimit = int(sys.argv[1])
-while(cap.isOpened()) and i<framelimit:
+#flowmeanx=[]
+#flowmeany=[]
 
-    # ret = a boolean return value from getting 
-    # the frame, frame = the current frame being 
-    # projected in the video 
-    ret, this_frame = cap.read() 
-    if ret==False:
-        break
-    orgframe = this_frame.copy()
-    # convert the first frame to grayscale 
-    gray = cv.cvtColor(cv.UMat(this_frame), cv.COLOR_BGR2GRAY) 
-    
-    # Calculates dense optical flow by Farneback method 
+while(cap.isOpened()):
+
+    # Calculate dense optical flow by Farneback method 
     # on GPU using OpenCL
-    flow = cv.calcOpticalFlowFarneback(prev_gray, gray, 
-    								prev_flow,
-    								0.5, 3, 11, 5, 5, 1.2, flowflags)
-    prev_flow = flow
+    flow = cv.calcOpticalFlowFarneback(gray_frames[1], gray_frames[2],
+    								None,
+    								0.5, 3, 15, 5, 5, 1.2, 0) #flowflags)
     
-    flowflags = cv.OPTFLOW_USE_INITIAL_FLOW
-    cpuflow = flow.get()
-    if klast_flow is None:
-        klast_flow = cpuflow
-    klast_flow = cpuflow # klast_flow * .7 + cpuflow * .3
-    flow = klast_flow
-    #flow = cpuflow
-    meanx = np.mean(flow[...,0])
-    meany = np.mean(flow[...,1])
-    flowmeanx.append(meanx)
-    flowmeany.append(meany)
+    #meanx = np.mean(flow[...,0])
+    #meany = np.mean(flow[...,1])
+    #flowmeanx.append(meanx)
+    #flowmeany.append(meany)
 
     # Computes the magnitude and angle of the 2D vectors 
-    magnitude, angle = cv.cartToPolar(cv.UMat(flow[..., 0]), cv.UMat(flow[..., 1])) 
+    magnitude, angle = cv.cartToPolar(cv.UMat(flow.get()[..., 0]), cv.UMat(flow.get()[..., 1])) 
     #
     # Sets image hue according to the optical flow 
     # direction 
@@ -126,7 +94,7 @@ while(cap.isOpened()) and i<framelimit:
     mask0 = cv.divide(mask0, np.pi * 2)
     mask2 = cv.UMat(magnitude)
     graymask = mask2 
-    grayasmk = cv.GaussianBlur(graymask, (15,15), 0)
+    graymask = cv.GaussianBlur(graymask, (15,15), 0)
     graymask = cv.normalize(graymask, None, 0, 255, cv.NORM_MINMAX, cv.CV_8UC1)
     graymask = cv.threshold(graymask, 160, 255, cv.THRESH_BINARY)[1]
     graymaskorg = cv.UMat(graymask)
@@ -139,6 +107,7 @@ while(cap.isOpened()) and i<framelimit:
     conts, heirarchy = cv.findContours(graymask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
     #print(len(conts))
     areas = []
+    this_frame = raw_frames[1].get()
     for j in range(len(conts)):
         cont = conts[j]
         x,y,w,h = cv.boundingRect(cont)
@@ -165,7 +134,7 @@ while(cap.isOpened()) and i<framelimit:
                 #continue
 
         x,y,w,h = cv.boundingRect(cont)
-        blob = orgframe[y:y+h,x:x+w].copy()
+        blob = raw_frames[1].get()[y:y+h,x:x+w].copy()
         area = cv.contourArea(cont)
         rectarea = w*h
         if area <500:
@@ -232,11 +201,11 @@ while(cap.isOpened()) and i<framelimit:
         subframe1 = np.zeros((sh,sw,3), dtype=np.uint8)
         subframe2 = np.zeros((sh,sw,3), dtype=np.uint8)
 
-        subframe0[desty:(desty+desth),destx:(destx+destw),:] = prv2_frame[sourcey:(sourcey+sourceh),sourcex:(sourcex+sourcew),:].copy()
-        subframe1[desty:(desty+desth),destx:(destx+destw),:] = prev_frame[sourcey:(sourcey+sourceh),sourcex:(sourcex+sourcew),:].copy()
-        subframe2[desty:(desty+desth),destx:(destx+destw),:] = this_frame[sourcey:(sourcey+sourceh),sourcex:(sourcex+sourcew),:].copy()
+        subframe0[desty:(desty+desth),destx:(destx+destw),:] = raw_frames[0].get()[sourcey:(sourcey+sourceh),sourcex:(sourcex+sourcew),:].copy()
+        subframe1[desty:(desty+desth),destx:(destx+destw),:] = raw_frames[1].get()[sourcey:(sourcey+sourceh),sourcex:(sourcex+sourcew),:].copy()
+        subframe2[desty:(desty+desth),destx:(destx+destw),:] = raw_frames[2].get()[sourcey:(sourcey+sourceh),sourcex:(sourcex+sourcew),:].copy()
 
-        subframe2 = cv.rectangle(subframe2,(x-sx,y-sy),(x+w-sx,y+h-sy),(0,255,255),2)
+        subframe1 = cv.rectangle(subframe1,(x-sx,y-sy),(x+w-sx,y+h-sy),(0,255,255),2)
 
 
 
@@ -258,9 +227,6 @@ while(cap.isOpened()) and i<framelimit:
         cv.putText(subframe2,'0', bottomLeftCornerOfBlack, font, fontScale, fontBlack, lineType)
         cv.putText(subframe2,'0', bottomLeftCornerOfText, font, fontScale, fontColor, lineType)
 
-
-
-
         cv.imwrite(f"{jpgdir}/sfr{i:04d}_c{j:04d}_sf0.jpg", subframe0)
         cv.imwrite(f"{jpgdir}/sfr{i:04d}_c{j:04d}_sf1.jpg", subframe1)
         cv.imwrite(f"{jpgdir}/sfr{i:04d}_c{j:04d}_sf2.jpg", subframe2)
@@ -276,10 +242,10 @@ while(cap.isOpened()) and i<framelimit:
 
 
 
-    plt.close('all')
-    plt.hist(areas) # bins=100)
-    plt.savefig(f"{jpgdir}/hist{i:04d}.jpg")
-    plt.close('all')
+    #plt.close('all')
+    #plt.hist(areas) # bins=100)
+    #plt.savefig(f"{jpgdir}/hist{i:04d}.jpg")
+    #plt.close('all')
 
     # Opens a new window and displays the output frame 
     cv.imwrite(f"{jpgdir}/graymask{i:04d}.jpg", graymask) #graymaskafter - graymaskorg)
@@ -287,12 +253,16 @@ while(cap.isOpened()) and i<framelimit:
     cv.imwrite(f"{jpgdir}/frame{i:04d}.jpg",this_frame)
     i=i+1
     # Updates previous frame 
-    prev_gray = gray
 
-    prv2_frame = prev_frame.copy()
-    prev_frame = this_frame.copy()
 
-    lastgraymask = cv.add(graymask,0)
+
+    raw_frames.pop(0)
+    gray_frames.pop(0)
+    ret, inframe = cap.read()
+    if ret==False:
+        break
+    raw_frames.append(cv.UMat(inframe))
+    gray_frames.append(cv.cvtColor(cv.UMat(inframe), cv.COLOR_BGR2GRAY))
 
     print(f"frame {i:04d}", end='\r')
     # Frames are read by intervals of 1 millisecond. The 
@@ -304,8 +274,8 @@ while(cap.isOpened()) and i<framelimit:
 # closes all windows 
 cap.release() 
 
-plt.plot(flowmeanx,'-',label='x')
-plt.plot(flowmeany,'-',label='y')
-plt.legend()
-plt.savefig("flowmean.png")
+#plt.plot(flowmeanx,'-',label='x')
+#plt.plot(flowmeany,'-',label='y')
+#plt.legend()
+#plt.savefig("flowmean.png")
 

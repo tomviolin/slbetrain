@@ -7,6 +7,8 @@ import sys
 import time
 import datetime
 import glob
+import sqlite3
+
 
 cgitb.enable()
 
@@ -14,34 +16,33 @@ print("Cache-Control: no-cache, no-store, must-revalidate")
 print("Pragma: no-cache")
 print("Expires: 0")
 
+print("Content-Type: application/json; charset=utf-8")
+print()
 # get values from the query string from an HTTP GET
 #
 # get the query string from an HTTP GET
-#query_string = os.environ["QUERY_STRING"]
+query_string = os.environ["QUERY_STRING"]
+if query_string == "":
+    print("No data received")
+    sys.exit(0)
 # get the value of the key-value pair
 # named "name"
 name = query_string.split("=")[1]
 form = cgi.FieldStorage()
 # get the value of the key-value pair
 # named "name"
-name = form.getvalue("base", "(no name)")
-
-
-print("Content-Type: application/json; charset=utf-8")
-print()
+base = form.getvalue("base", "(no name)")
+frame = form.getvalue("frame", "(no name)")
+cont = form.getvalue("cont", "(no name)")
 
 
 
-"""
-giflist= sorted(glob.glob('/home/tomh/slbetrain/trains/*/conts/*.gif'))
-
-gifpaths= [ '/'.join(x.split('/')[-3:]) for x in giflist]
-
-flagpaths = [('/'.join(x.split('/')[-3:])).replace('.gif','.flg') for x in giflist]
-
-flagsexist = [os.path.isfile('../'+x) for x in flagpaths]
+conn = sqlite3.connect('/home/tomh/slbetrain/samples.sqlite3')
+c = conn.cursor()
+c.execute('''
+    UPDATE samples 
+       SET user_category=1 where mediasource_base=? and frame_no=? and contour_id=?", (base, frame, cont))
+print(json.dumps({'base':base,'frame':frame,'cont':cont}))
 
 
-merged = list(zip(gifpaths,flagpaths,flagsexist))
-"""
 

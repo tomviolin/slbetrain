@@ -102,7 +102,7 @@ while(cap.isOpened()) and i<framelimit:
     # on GPU using OpenCL
     flow = cv.calcOpticalFlowFarneback(prev_gray, gray, 
     								prev_flow,
-    								0.5, 3, 19, 9, 5, 1.2, flowflags)
+    								0.5, 3, 11, 5, 5, 1.2, flowflags)
     prev_flow = flow
     
     flowflags = cv.OPTFLOW_USE_INITIAL_FLOW
@@ -131,8 +131,8 @@ while(cap.isOpened()) and i<framelimit:
     graymask = cv.threshold(graymask, 160, 255, cv.THRESH_BINARY)[1]
     graymaskorg = cv.UMat(graymask)
     for j in range(1):
-        graymask = cv.dilate(graymask, kernel9, iterations=2)
-        graymask = cv.erode(graymask, kernel9, iterations=2)
+        graymask = cv.dilate(graymask, kernel9, iterations=6)
+        graymask = cv.erode(graymask, kernel9, iterations=6)
     graymaskafter = cv.add(graymask,0)
     graymask1 = cv.add(graymask,0)
 
@@ -150,7 +150,7 @@ while(cap.isOpened()) and i<framelimit:
     for j in range(len(conts)):
         cont = conts[j]
 
-        if lastgraymask is not None:
+        if False: # lastgraymask is not None:
             blank = np.zeros_like(graymask.get()).astype(np.uint8)
             cv.drawContours(blank, [cont.get()], -1, 1, cv.FILLED)
             pixelcount = cv.countNonZero(blank)
@@ -159,8 +159,10 @@ while(cap.isOpened()) and i<framelimit:
             blank = blank * lgm
             pixelcountafter = cv.countNonZero(blank)
             print(f"{pixelcountafter}:{pixelcount}")
-            if pixelcountafter < pixelcount * .5:
-                continue
+            if pixelcountafter < pixelcount * .1:
+                pass
+                #cv.drawContours(this_frame, [cont.get()], -1, (255,0,255), 2)
+                #continue
 
         x,y,w,h = cv.boundingRect(cont)
         blob = orgframe[y:y+h,x:x+w].copy()
@@ -268,7 +270,7 @@ while(cap.isOpened()) and i<framelimit:
         cv.imwrite(f"{contsdir}/sfr{i:04d}_c{j:04d}_sfBLOB.jpg", blob)
         blob = open(f"{contsdir}/sfr{i:04d}_c{j:04d}_sfBLOB.jpg", 'rb').read()
         c = conn.cursor()
-        c.execute("INSERT INTO samples (sourcemedia_base, frame_no, contour_id, user_category, user_entered, x,y,w,h, image) VALUES (?,?,?,?,?,?,?,?,?,?)",
+        c.execute("INSERT OR IGNORE INTO samples (sourcemedia_base, frame_no, contour_id, user_category, user_entered, x,y,w,h, image) VALUES (?,?,?,?,?,?,?,?,?,?)",
                 (base,i,j,None,None, x,y,w,h, blob))
         conn.commit()
 

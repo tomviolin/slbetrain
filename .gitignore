@@ -10,3 +10,4 @@ venv/*
 __*__
 *.sqlite3
 sqlean
+ssl

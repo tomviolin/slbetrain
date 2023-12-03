@@ -17,7 +17,7 @@ window._x_startAt = 0;
 window._x_maxAt = 0;
 function updateBody() {
 
-	bdy = $("body")[0];
+	bdy = $("div.root")[0];
 	bdy.innerHTML = "";
 	headline = bdy.appendChild(document.createElement("p"));
 	headline.classList.add("title");
@@ -44,7 +44,7 @@ function updateBody() {
 				d.classList.add("trainbox");
 				jdi = jdata[i][0]+'';
 				hiresjpg = jdi.replace(".gif",".jpg").replace("conts","jpg").replace("_sfs","_sf1");
-				d.innerHTML=('<div class="imgflip"  id="swipe-left-right" data-mdb-touch-init="" data-mdb-event="swipe" data-mdb-treshold="100" data-mdb-touch-initialized="true"><img style="z-index:1" class="flipper sample" src="/slbetrain/trains/'+hiresjpg+'">'
+				d.innerHTML=('<div class="imgflip"><img style="z-index:1" class="flipper sample" src="/slbetrain/trains/'+hiresjpg+'">'
 								+ '<img style="z-index:0" class="flipper sampgif" src="/slbetrain/trains/'+jdata[i][0]+'"></div>'
 					+'<div class="btnstrip">'
 						+'<button class="train no" data-train="'+jdata[i][1]+'">NO</button>'
@@ -52,21 +52,24 @@ function updateBody() {
 
 				);
 			}
+			$("div.imgflip").swipe({
+				swipeLeft:function(e) {
+					console.log("swiped left!");
+					console.log(e);
+					e.preventDefault();
+				},
+				swipeRight:function(e) {
+					console.log("swiped right!");
+					console.log(e);
+					e.preventDefault();
+				}
+			});
 		}
 	});
 
 }
 
 (function() {
-
-	initMDB({ Touch });
-	const swipeLeftRight = document.querySelector('#swipe-left-right');
-	swipeLeftRight.addEventListener('swipeleft', (e) => {
-		alert('You swiped left!');
-	});
-	swipeLeftRight.addEventListener('swiperight', (e) => {
-		alert('You swiped right!');
-	});
 	window._x_startAt = 0;
 	updateBody();
 

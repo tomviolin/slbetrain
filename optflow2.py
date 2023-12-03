@@ -11,6 +11,9 @@ import sqlite3
 import time
 import datetime
 
+MAX_SAMPLE_DIM = 256
+
+
 conn = sqlite3.connect('samples.sqlite3')
 conn.execute('''CREATE TABLE IF NOT EXISTS samples
         (sourcemedia_base char(32), 
@@ -31,6 +34,20 @@ conn.execute('''CREATE TABLE IF NOT EXISTS samples
 kernel9 = cv.getStructuringElement(cv.MORPH_ELLIPSE,(9,9))
 kernel3 = cv.getStructuringElement(cv.MORPH_ELLIPSE,(3,3))
 kernel5 = cv.getStructuringElement(cv.MORPH_ELLIPSE,(5,5))
+
+
+def prep_graymask(flow):
+    magnitude, _ = cv.cartToPolar(cv.UMat(flow.get()[..., 0]), cv.UMat(flow.get()[..., 1])) 
+    graymask = cv.UMat(magnitude)
+    graymask = cv.GaussianBlur(graymask, (51,51), 0)
+    graymask = cv.normalize(graymask, None, 0, 255, cv.NORM_MINMAX, cv.CV_8UC1)
+    graymask = cv.threshold(graymask, 120, 255, cv.THRESH_BINARY)[1]
+    for j in range(1):
+        graymask = cv.dilate(graymask, kernel9, iterations=6)
+        graymask = cv.erode(graymask, kernel9, iterations=6)
+    return graymask
+
+
 
 
 # The video feed is read in as 
@@ -57,8 +74,13 @@ while len(raw_frames) < 3:
     ret, inframe = cap.read() 
     if ret==False:
         break
+    eqframe = inframe.copy()
+    eqframe[...,0] = cv.equalizeHist(eqframe[...,0])
+    eqframe[...,1] = cv.equalizeHist(eqframe[...,1])
+    eqframe[...,2] = cv.equalizeHist(eqframe[...,2])
+
     raw_frames.append(cv.UMat(inframe))
-    gray_frames.append(cv.cvtColor(cv.UMat(inframe), cv.COLOR_BGR2GRAY))
+    gray_frames.append(cv.equalizeHist(cv.cvtColor(cv.UMat(eqframe), cv.COLOR_BGR2GRAY)))
 
 i=0
 os.system(f"rm -rf {savepath}")
@@ -76,35 +98,27 @@ while(cap.isOpened()):
 
     # Calculate dense optical flow by Farneback method 
     # on GPU using OpenCL
-    flow = cv.calcOpticalFlowFarneback(gray_frames[1], gray_frames[2],
+    flow01 = cv.calcOpticalFlowFarneback(gray_frames[0], gray_frames[1],
     								None,
     								0.5, 3, 15, 5, 5, 1.2, 0) #flowflags)
-    
-    #meanx = np.mean(flow[...,0])
-    #meany = np.mean(flow[...,1])
-    #flowmeanx.append(meanx)
-    #flowmeany.append(meany)
+    flow12 = cv.calcOpticalFlowFarneback(gray_frames[1], gray_frames[2],
+                                    None,
+                                    0.5, 3, 15, 5, 5, 1.2, 0) #flowflags)
+    flow02 = cv.calcOpticalFlowFarneback(gray_frames[0], gray_frames[2],
+                                    None,
+                                    0.5, 3, 15, 5, 5, 1.2, 0) #flowflags)
+    flow10 = cv.calcOpticalFlowFarneback(gray_frames[1], gray_frames[0],
+                                    None,
+                                    0.5, 3, 15, 5, 5, 1.2, 0) #flowflags)
+    flow21 = cv.calcOpticalFlowFarneback(gray_frames[2], gray_frames[1],
+                                    None,
+                                    0.5, 3, 15, 5, 5, 1.2, 0) #flowflags)
 
-    # Computes the magnitude and angle of the 2D vectors 
-    magnitude, angle = cv.cartToPolar(cv.UMat(flow.get()[..., 0]), cv.UMat(flow.get()[..., 1])) 
-    #
-    # Sets image hue according to the optical flow 
-    # direction 
-    mask0 = cv.multiply(angle, 180)
-    mask0 = cv.divide(mask0, np.pi * 2)
-    mask2 = cv.UMat(magnitude)
-    graymask = mask2 
-    graymask = cv.GaussianBlur(graymask, (15,15), 0)
-    graymask = cv.normalize(graymask, None, 0, 255, cv.NORM_MINMAX, cv.CV_8UC1)
-    graymask = cv.threshold(graymask, 160, 255, cv.THRESH_BINARY)[1]
-    graymaskorg = cv.UMat(graymask)
-    for j in range(1):
-        graymask = cv.dilate(graymask, kernel9, iterations=6)
-        graymask = cv.erode(graymask, kernel9, iterations=6)
-    graymaskafter = cv.add(graymask,0)
-    graymask1 = cv.add(graymask,0)
 
-    conts, heirarchy = cv.findContours(graymask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
+    graymask_main = prep_graymask(flow12)
+    graymask_comp = prep_graymask(flow21)
+    conts, heirarchy = cv.findContours(graymask_main, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
+
     #print(len(conts))
     areas = []
     this_frame = raw_frames[1].get()
@@ -119,30 +133,24 @@ while(cap.isOpened()):
     for j in range(len(conts)):
         cont = conts[j]
 
-        if False: # lastgraymask is not None:
-            blank = np.zeros_like(graymask.get()).astype(np.uint8)
-            cv.drawContours(blank, [cont.get()], -1, 1, cv.FILLED)
-            pixelcount = cv.countNonZero(blank)
-            lgm = lastgraymask.get()
-            lgm[lgm>0] = 1
-            blank = blank * lgm
-            pixelcountafter = cv.countNonZero(blank)
-            print(f"{pixelcountafter}:{pixelcount}")
-            if pixelcountafter < pixelcount * .1:
-                pass
-                #cv.drawContours(this_frame, [cont.get()], -1, (255,0,255), 2)
-                #continue
-
+        blank = np.zeros_like(graymask_main.get()).astype(np.uint8)
+        cv.drawContours(blank, [cont.get()], -1, 1, cv.FILLED)
+        pixelcount = cv.countNonZero(blank)
+        blank = cv.multiply(blank, graymask_comp)
+        pixelcountafter = cv.countNonZero(blank)
+        print(f"{pixelcountafter}:{pixelcount}")
+        if pixelcountafter < pixelcount*0.3:
+            continue
         x,y,w,h = cv.boundingRect(cont)
         blob = raw_frames[1].get()[y:y+h,x:x+w].copy()
         area = cv.contourArea(cont)
         rectarea = w*h
-        if area <500:
+        if area <50:
             continue
-        if w >150 or h > 150:
+        if w > MAX_SAMPLE_DIM or h > MAX_SAMPLE_DIM:
             continue
-        sw = 150
-        sh = 150
+        sw = MAX_SAMPLE_DIM
+        sh = MAX_SAMPLE_DIM
 
         sx = x + (w // 2) - (sw // 2)
         sy = y + (h // 2) - (sh // 2)
@@ -205,7 +213,10 @@ while(cap.isOpened()):
         subframe1[desty:(desty+desth),destx:(destx+destw),:] = raw_frames[1].get()[sourcey:(sourcey+sourceh),sourcex:(sourcex+sourcew),:].copy()
         subframe2[desty:(desty+desth),destx:(destx+destw),:] = raw_frames[2].get()[sourcey:(sourcey+sourceh),sourcex:(sourcex+sourcew),:].copy()
 
-        subframe1 = cv.rectangle(subframe1,(x-sx,y-sy),(x+w-sx,y+h-sy),(0,255,255),2)
+        subframe1 = cv.rectangle(subframe1,(x-sx,y-sy),(x+w-sx,y+h-sy),(0,255,255),1)
+        subframe0 = cv.rectangle(subframe0,(x-sx,y-sy),(x+w-sx,y+h-sy),(0,205,205),1)
+        subframe2 = cv.rectangle(subframe2,(x-sx,y-sy),(x+w-sx,y+h-sy),(0,205,205),1)
+
 
 
 
@@ -231,7 +242,7 @@ while(cap.isOpened()):
         cv.imwrite(f"{jpgdir}/sfr{i:04d}_c{j:04d}_sf1.jpg", subframe1)
         cv.imwrite(f"{jpgdir}/sfr{i:04d}_c{j:04d}_sf2.jpg", subframe2)
 
-        os.system(f'cat {jpgdir}/sfr{i:04d}_c{j:04d}_sf*.jpg {jpgdir}/sfr{i:04d}_c{j:04d}_sf2.jpg | ffmpeg -v 0 -y -f jpeg_pipe -r 2 -i -  -vf "scale=iw:ih,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse"     {contsdir}/sfr{i:04d}_c{j:04d}_sfs.gif')
+        os.system(f'/bin/bash -c \'cat {jpgdir}/sfr{i:04d}_c{j:04d}_sf{{0,1,2,1,1,1}}.jpg\' | ffmpeg -v 0 -y -f jpeg_pipe -r 5 -i -  -vf "scale=iw:ih,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse"     {contsdir}/sfr{i:04d}_c{j:04d}_sfs.gif')
         # create sqlite record
         cv.imwrite(f"{contsdir}/sfr{i:04d}_c{j:04d}_sfBLOB.jpg", blob)
         blob = open(f"{contsdir}/sfr{i:04d}_c{j:04d}_sfBLOB.jpg", 'rb').read()
@@ -248,7 +259,7 @@ while(cap.isOpened()):
     #plt.close('all')
 
     # Opens a new window and displays the output frame 
-    cv.imwrite(f"{jpgdir}/graymask{i:04d}.jpg", graymask) #graymaskafter - graymaskorg)
+    cv.imwrite(f"{jpgdir}/graymask{i:04d}.jpg", graymask_main) #graymaskafter - graymaskorg)
 
     cv.imwrite(f"{jpgdir}/frame{i:04d}.jpg",this_frame)
     i=i+1
@@ -261,9 +272,14 @@ while(cap.isOpened()):
     ret, inframe = cap.read()
     if ret==False:
         break
-    raw_frames.append(cv.UMat(inframe))
-    gray_frames.append(cv.cvtColor(cv.UMat(inframe), cv.COLOR_BGR2GRAY))
+    eqframe = inframe.copy()
+    #eqframe[...,0] = cv.equalizeHist(eqframe[...,0])
+    #eqframe[...,1] = cv.equalizeHist(eqframe[...,1])
+    #eqframe[...,2] = cv.equalizeHist(eqframe[...,2])
 
+    raw_frames.append(cv.UMat(inframe))
+    gray_frames.append(cv.cvtColor(cv.UMat(eqframe), cv.COLOR_BGR2GRAY))
+    #gray_frames[-1] = cv.equalizeHist(gray_frames[-1])
     print(f"frame {i:04d}", end='\r')
     # Frames are read by intervals of 1 millisecond. The 
     # programs breaks out of the while loop when the 

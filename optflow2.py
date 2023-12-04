@@ -12,21 +12,22 @@ import time
 import datetime
 
 MAX_SAMPLE_DIM = 256
-
-
+ANALYSIS_FRAME_COUNT = 5
+PICTURE_FRAME = 2
 conn = sqlite3.connect('samples.sqlite3')
-conn.execute('''CREATE TABLE IF NOT EXISTS samples
-        (sourcemedia_base char(32), 
-        frame_no int,
-        contour_id int,
-        user_category int,
-        user_entered TIMESTAMP,
-        x int,
-        y int,
-        w int,
-        h int,
-        image blob,
-        PRIMARY KEY (sourcemedia_base, frame_no, contour_id)
+conn.execute('''CREATE TABLE IF NOT EXISTS samples (
+        recid INTEGER PRIMARY KEY AUTOINCREMENT,
+        created_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        sourcemedia_base CHAR(32), 
+        frame_no INTEGER,
+        contour_id INTEGER,
+        x INTEGER,
+        y INTEGER,
+        w INTEGER,
+        h INTEGER,
+        image BLOB,
+        still_context BLOB,
+        animated_context BLOB
         )''')
 
 
@@ -70,17 +71,6 @@ gray_frames = []
 # ret = a boolean return value from 
 # getting the frame, first_frame = the 
 # first frame in the entire video sequence 
-while len(raw_frames) < 3:
-    ret, inframe = cap.read() 
-    if ret==False:
-        break
-    eqframe = inframe.copy()
-    eqframe[...,0] = cv.equalizeHist(eqframe[...,0])
-    eqframe[...,1] = cv.equalizeHist(eqframe[...,1])
-    eqframe[...,2] = cv.equalizeHist(eqframe[...,2])
-
-    raw_frames.append(cv.UMat(inframe))
-    gray_frames.append(cv.equalizeHist(cv.cvtColor(cv.UMat(eqframe), cv.COLOR_BGR2GRAY)))
 
 i=0
 os.system(f"rm -rf {savepath}")
@@ -94,34 +84,42 @@ os.makedirs(contsdir, exist_ok=True)
 #flowmeanx=[]
 #flowmeany=[]
 
+
+# Calculate dense optical flow by Farneback method 
+# on GPU using OpenCL
+def calcFlow(i1,i2):
+    global gray_frames
+    flow = cv.calcOpticalFlowFarneback(gray_frames[i1], gray_frames[i2],
+                                    None,
+                                    0.5, 3, 15, 5, 5, 1.2, 0)
+    return flow
+
+def putShadowedText(img, text, xorigin, yorigin, fontFace=cv.FONT_HERSHEY_SIMPLEX, fontScale=1, color=(255,255,255), 
+        shadowcolor=(0,0,0), thickness=1, lineType=cv.LINE_AA):
+    cv.putText(img,text, (xorigin+0,yorigin+0), fontFace=font, fontScale=fontScale, color=shadowcolor, thickness=thickness, lineType=lineType)
+    cv.putText(img,text, (xorigin+1,yorigin+1), fontFace=font, fontScale=fontScale, color=color,       thickness=thickness, lineType=lineType)
+
+
+
 while(cap.isOpened()):
 
-    # Calculate dense optical flow by Farneback method 
-    # on GPU using OpenCL
-    flow01 = cv.calcOpticalFlowFarneback(gray_frames[0], gray_frames[1],
-    								None,
-    								0.5, 3, 15, 5, 5, 1.2, 0) #flowflags)
-    flow12 = cv.calcOpticalFlowFarneback(gray_frames[1], gray_frames[2],
-                                    None,
-                                    0.5, 3, 15, 5, 5, 1.2, 0) #flowflags)
-    flow02 = cv.calcOpticalFlowFarneback(gray_frames[0], gray_frames[2],
-                                    None,
-                                    0.5, 3, 15, 5, 5, 1.2, 0) #flowflags)
-    flow10 = cv.calcOpticalFlowFarneback(gray_frames[1], gray_frames[0],
-                                    None,
-                                    0.5, 3, 15, 5, 5, 1.2, 0) #flowflags)
-    flow21 = cv.calcOpticalFlowFarneback(gray_frames[2], gray_frames[1],
-                                    None,
-                                    0.5, 3, 15, 5, 5, 1.2, 0) #flowflags)
+    while len(raw_frames) < ANALYSIS_FRAME_COUNT:
+        ret, inframe = cap.read() 
+        if ret==False:
+            break
 
+        raw_frames.append(cv.UMat(inframe))
+        gray_frames.append((cv.cvtColor(cv.UMat(inframe), cv.COLOR_BGR2GRAY)))
+    if not ret:
+        break
 
-    graymask_main = prep_graymask(flow12)
-    graymask_comp = prep_graymask(flow21)
+    graymask_main = prep_graymask(calcFlow(2,4))
+    graymask_comp = prep_graymask(calcFlow(1,3))
     conts, heirarchy = cv.findContours(graymask_main, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
 
     #print(len(conts))
     areas = []
-    this_frame = raw_frames[1].get()
+    this_frame = raw_frames[PICTURE_FRAME].get()
     for j in range(len(conts)):
         cont = conts[j]
         x,y,w,h = cv.boundingRect(cont)
@@ -131,18 +129,18 @@ while(cap.isOpened()):
         cv.rectangle(this_frame,(x,y),(x+w,y+h),(0,255,0),2)
 
     for j in range(len(conts)):
-        cont = conts[j]
+        cont = conts[j].get()
 
         blank = np.zeros_like(graymask_main.get()).astype(np.uint8)
-        cv.drawContours(blank, [cont.get()], -1, 1, cv.FILLED)
+        cv.drawContours(blank, [cont], -1, 1, cv.FILLED)
         pixelcount = cv.countNonZero(blank)
         blank = cv.multiply(blank, graymask_comp)
         pixelcountafter = cv.countNonZero(blank)
-        print(f"{pixelcountafter}:{pixelcount}")
+        print(f"[{pixelcountafter}:{pixelcount}]")
         if pixelcountafter < pixelcount*0.3:
             continue
         x,y,w,h = cv.boundingRect(cont)
-        blob = raw_frames[1].get()[y:y+h,x:x+w].copy()
+        blob = raw_frames[PICTURE_FRAME].get()[y:y+h,x:x+w].copy()
         area = cv.contourArea(cont)
         rectarea = w*h
         if area <50:
@@ -205,89 +203,54 @@ while(cap.isOpened()):
         if destw <= 0 or desth <= 0:
             continue
 
-        subframe0 = np.zeros((sh,sw,3), dtype=np.uint8)
-        subframe1 = np.zeros((sh,sw,3), dtype=np.uint8)
-        subframe2 = np.zeros((sh,sw,3), dtype=np.uint8)
-
-        subframe0[desty:(desty+desth),destx:(destx+destw),:] = raw_frames[0].get()[sourcey:(sourcey+sourceh),sourcex:(sourcex+sourcew),:].copy()
-        subframe1[desty:(desty+desth),destx:(destx+destw),:] = raw_frames[1].get()[sourcey:(sourcey+sourceh),sourcex:(sourcex+sourcew),:].copy()
-        subframe2[desty:(desty+desth),destx:(destx+destw),:] = raw_frames[2].get()[sourcey:(sourcey+sourceh),sourcex:(sourcex+sourcew),:].copy()
-
-        subframe1 = cv.rectangle(subframe1,(x-sx,y-sy),(x+w-sx,y+h-sy),(0,255,255),1)
-        subframe0 = cv.rectangle(subframe0,(x-sx,y-sy),(x+w-sx,y+h-sy),(0,205,205),1)
-        subframe2 = cv.rectangle(subframe2,(x-sx,y-sy),(x+w-sx,y+h-sy),(0,205,205),1)
-
-
-
+        subframes = [ np.zeros((MAX_SAMPLE_DIM,MAX_SAMPLE_DIM,3), dtype=np.uint8) ] * ANALYSIS_FRAME_COUNT
+        print(f"({destx},{desty}) ({destw},{desth}) ({sourcex},{sourcey}) ({sourcew},{sourceh})")
+        print(f"len(subframes)={len(subframes)}")
+        for k in range(ANALYSIS_FRAME_COUNT):
+            this_raw_frame = raw_frames[k].get()
+            subframes[k] = np.zeros((MAX_SAMPLE_DIM,MAX_SAMPLE_DIM,3), dtype=np.uint8)
+            subframes[k][desty:(desty+desth),destx:(destx+destw),:] = this_raw_frame[sourcey:(sourcey+sourceh),sourcex:(sourcex+sourcew),:]
+            subframes[k] = cv.rectangle(subframes[k],(x-sx,y-sy),(x+w-sx,y+h-sy),(0,205,205),1)
 
         # Write some Text
 
         font                   = cv.FONT_HERSHEY_SIMPLEX
-        bottomLeftCornerOfText = (10,10)
-        bottomLeftCornerOfBlack = (11,11)
         fontScale              = 0.3
         fontColor              = (0,255,255)
-        fontBlack              = (0,0,0)
         lineType               = 1
+       
+        for k in range(ANALYSIS_FRAME_COUNT):
+            putShadowedText(subframes[k],f"{k-PICTURE_FRAME}", 10,10, font, fontScale, fontColor, lineType)
+            putShadowedText(subframes[k],f"{j}", 10,20, font, fontScale, fontColor, lineType)
+            putShadowedText(subframes[k],f"{i}", 10,30, font, fontScale, fontColor, lineType)
+        for k in range(ANALYSIS_FRAME_COUNT):
+            cv.imwrite(f"{jpgdir}/sfr{i:04d}_c{j:04d}_sf{k}.jpg", subframes[k])
 
-        
-        cv.putText(subframe0,'-2', bottomLeftCornerOfBlack, font, fontScale, fontBlack, lineType)
-        cv.putText(subframe0,'-2', bottomLeftCornerOfText, font, fontScale, fontColor, lineType)
-        cv.putText(subframe1,'-1', bottomLeftCornerOfBlack, font, fontScale, fontBlack, lineType)
-        cv.putText(subframe1,'-1', bottomLeftCornerOfText, font, fontScale, fontColor, lineType)
-        cv.putText(subframe2,'0', bottomLeftCornerOfBlack, font, fontScale, fontBlack, lineType)
-        cv.putText(subframe2,'0', bottomLeftCornerOfText, font, fontScale, fontColor, lineType)
-
-        cv.imwrite(f"{jpgdir}/sfr{i:04d}_c{j:04d}_sf0.jpg", subframe0)
-        cv.imwrite(f"{jpgdir}/sfr{i:04d}_c{j:04d}_sf1.jpg", subframe1)
-        cv.imwrite(f"{jpgdir}/sfr{i:04d}_c{j:04d}_sf2.jpg", subframe2)
-
-        os.system(f'/bin/bash -c \'cat {jpgdir}/sfr{i:04d}_c{j:04d}_sf{{0,1,2,1,1,1}}.jpg\' | ffmpeg -v 0 -y -f jpeg_pipe -r 5 -i -  -vf "scale=iw:ih,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse"     {contsdir}/sfr{i:04d}_c{j:04d}_sfs.gif')
+        os.system(f'/bin/bash -c \'cat {jpgdir}/sfr{i:04d}_c{j:04d}_sf{{0,1,2,3,4,4,4}}.jpg\' | ffmpeg -v 0 -y -f jpeg_pipe -r 5 -i -  -vf "scale=iw:ih,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse"     {contsdir}/sfr{i:04d}_c{j:04d}_sfs.gif')
         # create sqlite record
         cv.imwrite(f"{contsdir}/sfr{i:04d}_c{j:04d}_sfBLOB.jpg", blob)
         blob = open(f"{contsdir}/sfr{i:04d}_c{j:04d}_sfBLOB.jpg", 'rb').read()
+        blob_still_context = open(f"{jpgdir}/sfr{i:04d}_c{j:04d}_sf{PICTURE_FRAME}.jpg", 'rb').read()
+        blob_animated_context = open(f"{contsdir}/sfr{i:04d}_c{j:04d}_sfs.gif", 'rb').read()
         c = conn.cursor()
-        c.execute("INSERT OR IGNORE INTO samples (sourcemedia_base, frame_no, contour_id, user_category, user_entered, x,y,w,h, image) VALUES (?,?,?,?,?,?,?,?,?,?)",
+        c.execute("INSERT OR IGNORE INTO samples (sourcemedia_base, frame_no, contour_id, x,y,w,h, image, still_context, animated_context) VALUES (?,?,?,?,?,?,?,?,?,?)",
                 (base,i,j,None,None, x,y,w,h, blob))
         conn.commit()
 
 
 
-    #plt.close('all')
-    #plt.hist(areas) # bins=100)
-    #plt.savefig(f"{jpgdir}/hist{i:04d}.jpg")
-    #plt.close('all')
 
-    # Opens a new window and displays the output frame 
-    cv.imwrite(f"{jpgdir}/graymask{i:04d}.jpg", graymask_main) #graymaskafter - graymaskorg)
-
+    cv.imwrite(f"{jpgdir}/graymask{i:04d}.jpg", graymask_main)
+    cv.imwrite(f"{jpgdir}/graycomp{i:04d}.jpg", graymask_comp)
     cv.imwrite(f"{jpgdir}/frame{i:04d}.jpg",this_frame)
     i=i+1
     # Updates previous frame 
 
 
-
     raw_frames.pop(0)
     gray_frames.pop(0)
-    ret, inframe = cap.read()
-    if ret==False:
-        break
-    eqframe = inframe.copy()
-    #eqframe[...,0] = cv.equalizeHist(eqframe[...,0])
-    #eqframe[...,1] = cv.equalizeHist(eqframe[...,1])
-    #eqframe[...,2] = cv.equalizeHist(eqframe[...,2])
-
-    raw_frames.append(cv.UMat(inframe))
-    gray_frames.append(cv.cvtColor(cv.UMat(eqframe), cv.COLOR_BGR2GRAY))
-    #gray_frames[-1] = cv.equalizeHist(gray_frames[-1])
     print(f"frame {i:04d}", end='\r')
-    # Frames are read by intervals of 1 millisecond. The 
-    # programs breaks out of the while loop when the 
-    # user presses the 'q' key 
-    # lastlastgraymask = lastgraymask
-    # lastgraymask = graymask
-# The following frees up resources and 
-# closes all windows 
+
 cap.release() 
 
 #plt.plot(flowmeanx,'-',label='x')

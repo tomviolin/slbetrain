@@ -1,8 +1,8 @@
 
-
+const PAGESIZE = 8;
 
 function prev() {
-	window._x_startAt -= 50;
+	window._x_startAt -= PAGESIZE;
 	if (window._x_startAt < 0) {
 		window._x_startAt = 0;
 	}
@@ -10,14 +10,14 @@ function prev() {
 }
 
 function next() {
-	window._x_startAt += 50;
+	window._x_startAt += PAGESIZE;
 	updateBody();
 }
 window._x_startAt = 0;
 window._x_maxAt = 0;
 function updateBody() {
 
-	bdy = $("div.root")[0];
+	bdy = $("div#root")[0];
 	bdy.innerHTML = "";
 	headline = bdy.appendChild(document.createElement("p"));
 	headline.classList.add("title");
@@ -32,18 +32,18 @@ function updateBody() {
 	buttonhtml += '<button class="next" onclick="next()">&gt;&gt;</button>';
 	buttonhtml += '<button class="last" onclick="window._x_startAt=window._x_maxAt;updateBody()">&gt;|</button>';
 	buttonhtml += '</div>';
-	headline.innerHTML=("FISH IDENTIFICATION TRAINING<br>"+buttonhtml);
+	headline.innerHTML=("IS THIS A FISH?<br>"+buttonhtml);
 
 	$.ajax("/slbetrain/cgi-bin/getconts.cgi", {
 		"complete": function(data) {
 			console.log(data);
 			jdata = data.responseJSON;
 			window._x_maxAt = jdata.length;
-			for (var i=window._x_startAt; i<Math.min(jdata.length,window._x_startAt+50); i++) {
+			for (var i=window._x_startAt; i<Math.min(jdata.length,window._x_startAt+PAGESIZE); i++) {
 				var d=bdy.appendChild(document.createElement("div"));
 				d.classList.add("trainbox");
 				jdi = jdata[i][0]+'';
-				hiresjpg = jdi.replace(".gif",".jpg").replace("conts","jpg").replace("_sfs","_sf1");
+				hiresjpg = jdi.replace(".gif",".jpg").replace("conts","jpg").replace("_sfs","_sf2");
 				d.innerHTML=('<div class="imgflip"><img style="z-index:1" class="flipper sample" src="/slbetrain/trains/'+hiresjpg+'">'
 								+ '<img style="z-index:0" class="flipper sampgif" src="/slbetrain/trains/'+jdata[i][0]+'"></div>'
 					+'<div class="btnstrip">'
@@ -56,12 +56,12 @@ function updateBody() {
 				swipeLeft:function(e) {
 					console.log("swiped left!");
 					console.log(e);
-					e.preventDefault();
+					//e.preventDefault();
 				},
 				swipeRight:function(e) {
 					console.log("swiped right!");
 					console.log(e);
-					e.preventDefault();
+					//e.preventDefault();
 				}
 			});
 		}

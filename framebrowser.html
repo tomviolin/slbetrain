@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<title>SLBE Train</title>
+<script src='https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js'></script>
+<script>
+var frame = parseInt(location.hash.split('frameno=')[1]);
+if (isNaN(frame)) {
+  frame = 0;
+}
+function nextFrame() {
+  frame++;
+  location.hash = 'frameno=' + frame;
+  getFrame();
+}
+function prevFrame() {
+  frame--;
+  location.hash = 'frameno=' + frame;
+  getFrame();
+}
+function getFrame() {
+  $.ajax({
+    url: 'cgi-bin/getframebyno.cgi?frameno=' + frame + '&frametype=flowdev',
+    type: 'GET',
+    error: function() {
+      frame--;
+      if (frame < 0) {
+	return;
+      }
+      location.hash = 'frameno=' + frame;
+      getFrame();
+    },
+    success: function(data) {
+      console.log(data);
+      var frameuri = data['frameuri'];
+      frame = data['frameno'];
+      var img = document.getElementsByTagName('img')[0];
+      img.src = frameuri;
+    }
+  });
+}
+(function() {
+  getFrame();
+})();
+</script>
+</head>
+<body>
+<img width='100%' src="">
+</body>
+<script>
+$(window).keydown(function(e) {
+  switch (e.keyCode) {
+    case 37: // left arrow key
+    case 38: // up arrow key
+      e.preventDefault(); // avoid browser scrolling due to pressed key
+      prevFrame();
+      return;
+    case 39: // right arrow key
+    case 40: // up arrow key
+      e.preventDefault();
+      nextFrame();
+      return;
+  }
+});
+</script>
+</html>
+
+

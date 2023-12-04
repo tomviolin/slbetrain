@@ -25,9 +25,7 @@ query_string = os.environ["QUERY_STRING"]
 if query_string == "":
     print("No data received")
     sys.exit(0)
-# get the value of the key-value pair
-# named "name"
-name = query_string.split("=")[1]
+
 form = cgi.FieldStorage()
 # get the value of the key-value pair
 # named "name"

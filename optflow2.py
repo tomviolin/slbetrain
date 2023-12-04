@@ -30,6 +30,12 @@ conn.execute('''CREATE TABLE IF NOT EXISTS samples (
         animated_context BLOB
         )''')
 
+conn.execute('''CREATE TABLE IF NOT EXISTS useractivity (
+        recid INTEGER PRIMARY KEY AUTOINCREMENT,
+        created_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        user CHAR(32),
+        user_choice INTEGER,
+        image BLOB)''')
 
 # establish structuring element for dilation
 kernel9 = cv.getStructuringElement(cv.MORPH_ELLIPSE,(9,9))
@@ -234,7 +240,7 @@ while(cap.isOpened()):
         blob_animated_context = open(f"{contsdir}/sfr{i:04d}_c{j:04d}_sfs.gif", 'rb').read()
         c = conn.cursor()
         c.execute("INSERT OR IGNORE INTO samples (sourcemedia_base, frame_no, contour_id, x,y,w,h, image, still_context, animated_context) VALUES (?,?,?,?,?,?,?,?,?,?)",
-                (base,i,j,None,None, x,y,w,h, blob))
+                (base,i,j, x,y,w,h, blob, blob_still_context, blob_animated_context))
         conn.commit()
 
 

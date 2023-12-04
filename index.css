@@ -90,7 +90,27 @@ img.sampgif:hover {
     font-size: 20px;
 }
 
-.btnstrip .yes {
+.btnstrip button {
+	height:50px;
+	width:50px;
+}
+.btnstrip button img {
+	height:50px;
+	width:50px;
+}
+
+.btnstrip button.yes {
+	margin-left:40px;
+	border: none;
+	background-color: transparent;
+}
+.btnstrip button.no {
+	margin-right:40px;
+	border: none;
+	background-color: transparent;
+}
+
+.btnstrip .yesx {
     background-color: #00ff00;
     border: 1px solid #000000;
     border-radius: 5px;
@@ -103,7 +123,7 @@ img.sampgif:hover {
     cursor: pointer;
 }
 
-.btnstrip .no {
+.btnstrip .nox {
     background-color: #ff0000;
     border: 1px solid #000000;
     border-radius: 5px;
@@ -116,11 +136,11 @@ img.sampgif:hover {
     cursor: pointer;
 }
 
-.btnstrip button.yes:hover {
+.btnstripx button.yes:hover {
     background-color: #88ff88;
     font-weight: bold;
 }
-.btnstrip button.no:hover {
+.btnstripx button.no:hover {
     background-color: #ff8888;
     font-weight: bold;
 }

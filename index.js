@@ -98,8 +98,8 @@ function updateBody() {
 					+'<img style="z-index:1" class="sample" data-recid="'+jdata[i]['recid']+'" src="data:image/jpg;base64,'+jdata[i]['still_context']+'">'
 					+ '<img style="z-index:0" class="sampgif" data-recid="'+jdata[i]['recid']+'" src="data:image/gif;base64,'+jdata[i]['animated_context']+'"></div>'
 					+'<div class="btnstrip">'
-						+'<button class="train no" onclick="choseNo('+jdata[i]['recid']+')">NO</button>'
-						+'<button class="train yes" onclick="choseYes('+jdata[i]['recid']+')">YES</button>'
+						+'<button class="train no" onclick="choseNo('+jdata[i]['recid']+')"><img src="fish_no.png"></button>'
+						+'<button class="train yes" onclick="choseYes('+jdata[i]['recid']+')"><img src="fish_yes.png"</button>'
 					+'</div>'
 				);
 			}

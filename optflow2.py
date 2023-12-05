@@ -119,6 +119,24 @@ while(cap.isOpened()):
     if not ret:
         break
 
+    flow03 = calcFlow(0,3)
+    flow14 = calcFlow(1,4)
+
+    flowdiff = cv.UMat(np.zeros_like(flow03.get()))
+    flowdiff = cv.subtract(flow03, flow14)
+    flowmag, _ = cv.cartToPolar(cv.UMat(flowdiff.get()[..., 0]), cv.UMat(flowdiff.get()[..., 1]))
+
+    flowmag = cv.normalize(flowmag, None, 0, 255, cv.NORM_MINMAX, cv.CV_8UC1)
+    cv.imwrite(f"{jpgdir}/flowmag{i:04d}.jpg", flowmag)
+    raw_frames.pop(0)
+    gray_frames.pop(0)
+    print(f"frame {i:04d}", end='\r')
+    continue
+
+
+    flowdiff = cv.threshold(flowdiff, 30, 255, cv.THRESH_BINARY)[1]
+
+
     graymask_main = prep_graymask(calcFlow(2,4))
     graymask_comp = prep_graymask(calcFlow(1,3))
     conts, heirarchy = cv.findContours(graymask_main, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)

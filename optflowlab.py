@@ -110,17 +110,24 @@ def putShadowedText(img, text, xorigin, yorigin, fontFace=cv.FONT_HERSHEY_SIMPLE
 while(cap.isOpened()):
 
     while len(raw_frames) < ANALYSIS_FRAME_COUNT:
-        ret, inframe = cap.read() 
+        print(f"reading frame {i:04d}", end='')
+        ret, inframe = cap.read()
+        print(f" {ret}:", end='')
         if ret==False:
+            print("break.")
             break
-
+        print("recording frame...", end='')
         raw_frames.append(cv.UMat(inframe))
         gray_frames.append((cv.cvtColor(cv.UMat(inframe), cv.COLOR_BGR2GRAY)))
+        print("done.")
     if not ret:
         break
 
+    print(f"processing frame {i:04d}")
     flow03 = calcFlow(0,3)
     flow14 = calcFlow(1,4)
+    print(f"done with calcFlows,")
+
 
     flowdiff = cv.UMat(np.zeros_like(flow03.get()))
     flowdiff = cv.subtract(flow03, flow14)
@@ -128,6 +135,7 @@ while(cap.isOpened()):
 
     flowmag = cv.normalize(flowmag, None, 0, 255, cv.NORM_MINMAX, cv.CV_8UC1)
     cv.imwrite(f"{jpgdir}/flowmag{i:04d}.jpg", flowmag)
+    i=i+1
     raw_frames.pop(0)
     gray_frames.pop(0)
     print(f"frame {i:04d}", end='\r')
@@ -267,10 +275,8 @@ while(cap.isOpened()):
     cv.imwrite(f"{jpgdir}/graymask{i:04d}.jpg", graymask_main)
     cv.imwrite(f"{jpgdir}/graycomp{i:04d}.jpg", graymask_comp)
     cv.imwrite(f"{jpgdir}/frame{i:04d}.jpg",this_frame)
-    i=i+1
     # Updates previous frame 
-
-
+    i=i+1
     raw_frames.pop(0)
     gray_frames.pop(0)
     print(f"frame {i:04d}", end='\r')

@@ -11,6 +11,7 @@ import sqlite3
 import time
 import datetime
 
+OF_DATESTAMP=os.environ['OF_DATESTAMP']
 MAX_SAMPLE_DIM = 256
 ANALYSIS_FRAME_COUNT = 5
 PICTURE_FRAME = 2

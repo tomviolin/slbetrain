@@ -4,6 +4,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 import cv2 as cv 
+import cv2
 import numpy as np 
 import os, sys
 
@@ -99,6 +100,16 @@ def calcFlow(i1,i2):
     flow = cv.calcOpticalFlowFarneback(gray_frames[i1], gray_frames[i2],
                                     None,
                                     0.5, 3, 15, 5, 5, 1.2, 0)
+    flowmag, flowdir = cv.cartToPolar(cv.UMat(flow.get()[..., 0]), cv.UMat(flow.get()[..., 1]))
+
+    return flow, flowmag, flowdir
+
+def calcFlowRLOF(i1,i2):
+    global raw_frames, gray_frames
+    flow = cv.optflow.calcOpticalFlowDenseRLOF(	raw_frames[i1], raw_frames[i2], 
+            None, rlofParam=0.5, forwardBackwardThreshold=3, gridStep=15, interp_type=5,
+            epicK=5, epicSigma=1.1, epicLambda=0.01, ricSPSize=15, ricSLICType=100,
+            use_post_proc=True, fgsLambda=500.0, fgsSigma=1.5, use_variational_refinement=True)
     return flow
 
 def putShadowedText(img, text, xorigin, yorigin, fontFace=cv.FONT_HERSHEY_SIMPLEX, fontScale=1, color=(255,255,255), 
@@ -106,7 +117,83 @@ def putShadowedText(img, text, xorigin, yorigin, fontFace=cv.FONT_HERSHEY_SIMPLE
     cv.putText(img,text, (xorigin+0,yorigin+0), fontFace=font, fontScale=fontScale, color=shadowcolor, thickness=thickness, lineType=lineType)
     cv.putText(img,text, (xorigin+1,yorigin+1), fontFace=font, fontScale=fontScale, color=color,       thickness=thickness, lineType=lineType)
 
+def normalize(img):
+    return cv.normalize(img, None, 0, 255, cv.NORM_MINMAX, cv.CV_8UC1)
 
+
+nextWindowx = 0
+nextWindowy = 0
+nextRowWindowy = 0
+
+keyq = []
+
+# readKey() allows the GUI to update, and queues any keypress events
+# so they can be checked at the end of the display loop
+def readKey(n=1):
+    global keyq
+    k = cv.waitKey(n)
+    if k != -1:
+        keyq.append(k)
+
+def getKey():
+    readKey()
+    global keyq
+    if len(keyq) > 0:
+        return keyq.pop(0)
+    else:
+        return -1
+
+
+def newNamedWindow(wname, psizex=320,psizey=240, pposx=-1, pposy=-1):
+    sizex=psizex
+    sizey=psizey
+    global nextWindowx, nextWindowy, nextRowWindowy
+    if pposx == -1:
+        posx = nextWindowx
+    else:
+        posx = pposx
+    if pposy == -1:
+        posy = nextWindowy
+    else:
+        posy = pposy
+
+    # positions the window.
+    # if it's too far to the right, move it to the next row
+    if posx + sizex > 1920:
+        print(f"{wname}: sizex({sizex}) + posx({posx}) > 1920; moving {wname} to next row")
+        posx = 0
+        print(f"{wname}: posx={posx}")
+        posy = nextRowWindowy
+        print(f"{wname}: posy={posy}; nextRowWindowy={nextRowWindowy}")
+        nextRowWindowy = nextRowWindowy + sizey
+
+    cv.namedWindow(wname, cv.WINDOW_NORMAL); readKey(100)
+    print(f"{wname}: moving to posx={posx} posy={posy}")
+    for qq in range(1):
+        cv.moveWindow(wname, posx, posy); readKey()
+    readKey(1)
+    for qq in range(1):
+        cv.resizeWindow(wname, sizex, sizey); readKey();
+    readKey(1)
+    # now compute where the next window should go
+    nextWindowx += sizex
+    nextRowWindowy = max(nextRowWindowy, posy+sizey)
+    if nextWindowx > 1920:
+        nextWindowx = 0
+        nextWindowy = nextRowWindowy
+        nextRowWindowy += sizey
+
+    print(f"{wname}: nextWindowx={nextWindowx} nextWindowy={nextWindowy} nextRowWindowy={nextRowWindowy}")
+    return wname
+
+
+newNamedWindow('flow03', 500,300)
+newNamedWindow('flow14', 500,300)
+newNamedWindow('flowdiff',500,300)
+
+def showImage(wname, img):
+    cv.imshow(wname, img)
+    readKey()
 
 while(cap.isOpened()):
 
@@ -123,15 +210,39 @@ while(cap.isOpened()):
     flow03 = calcFlow(0,3)
     flow14 = calcFlow(1,4)
 
-    flowdiff = cv.UMat(np.zeros_like(flow03.get()))
-    flowdiff = cv.subtract(flow03, flow14)
-    flowmag, _ = cv.cartToPolar(cv.UMat(flowdiff.get()[..., 0]), cv.UMat(flowdiff.get()[..., 1]))
+        flowdiff = cv.UMat(np.zeros_like(flow03.get()))
+        flowdiff = cv.subtract(flow03, flow14)
+        flowdiffmag, _ = cv.cartToPolar(cv.UMat(flowdiff.get()[..., 0]), cv.UMat(flowdiff.get()[..., 1]))
+
+        flowdiffmag = cv.normalize(flowdiffmag, None, 0, 255, cv.NORM_MINMAX, cv.CV_8UC1)
+        #cv.imwrite(f"{jpgdir}/flowdiffmag{i:04d}.jpg", flowdiffmag)
+        #cv.imwrite(f"{jpgdir}/flow03{i:04d}.jpg", flow03)
+
+        showImage('flow03', normalize(flow03mag))
+        showImage('flow14', normalize(flow14mag))
+        showImage('flowdiff', normalize(flowdiffmag))
+
+        k=getKey()
+        if (k & 0xFF) == ord('q'):
+            cap.release()
+            break
+        if (k & 0xFF) == ord(' '):
+            break
+        if (k & 0xFF) == ord('s'):
+            cv.imwrite(f"{jpgdir}/flow03{i:04d}.jpg", flow03)
+            cv.imwrite(f"{jpgdir}/flow14{i:04d}.jpg", flow14)
+            cv.imwrite(f"{jpgdir}/flowdiff{i:04d}.jpg", flowdiff)
+            cv.imwrite(f"{jpgdir}/flow03mag{i:04d}.jpg", flow03mag)
+            cv.imwrite(f"{jpgdir}/flow14mag{i:04d}.jpg", flow14mag)
+            cv.imwrite(f"{jpgdir}/flowdiffmag{i:04d}.jpg", flowdiffmag)
+            print("saved.")
 
     flowmag = cv.normalize(flowmag, None, 0, 255, cv.NORM_MINMAX, cv.CV_8UC1)
     cv.imwrite(f"{jpgdir}/flowmag{i:04d}.jpg", flowmag)
     raw_frames.pop(0)
     gray_frames.pop(0)
     print(f"frame {i:04d}", end='\r')
+
     continue
 
 

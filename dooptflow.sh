@@ -8,7 +8,7 @@ MINUTE=${OF_DATESTAMP:14:2}
 SECOND=${OF_DATESTAMP:17:2}
 
 # This script is used to run the optical flow algorithm on a set of images
-
+LOCATIONCODE="SBLE"
 # Usage: ./dooptflow.sh <directory> <output directory> <output video name>
 export OF_DATESTAMP
 for mf in mp4/SLBE_*.mp4; do

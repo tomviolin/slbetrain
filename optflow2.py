@@ -49,7 +49,7 @@ def prep_graymask(flow):
     magnitude, _ = cv.cartToPolar(cv.UMat(flow.get()[..., 0]), cv.UMat(flow.get()[..., 1])) 
     graymask = cv.UMat(magnitude)
     graymask = cv.GaussianBlur(graymask, (51,51), 0)
-    graymask = cv.normalize(graymask, None, 0, 255, cv.NORM_MINMAX, cv.CV_8UC1)
+    #graymask = cv.normalize(graymask, None, 0, 255, cv.NORM_MINMAX, cv.CV_8UC1)
     graymask = cv.threshold(graymask, 120, 255, cv.THRESH_BINARY)[1]
     for j in range(1):
         graymask = cv.dilate(graymask, kernel9, iterations=6)
@@ -99,7 +99,7 @@ def calcFlow(i1,i2):
     global gray_frames
     flow = cv.calcOpticalFlowFarneback(gray_frames[i1], gray_frames[i2],
                                     None,
-                                    0.5, 3, 15, 5, 5, 1.2, 0)
+                                    0.5, 3, 3, 5, 5, 1.2, 0)
     flowmag, flowdir = cv.cartToPolar(cv.UMat(flow.get()[..., 0]), cv.UMat(flow.get()[..., 1]))
 
     return flow, flowmag, flowdir
@@ -167,7 +167,7 @@ def newNamedWindow(wname, psizex=320,psizey=240, pposx=-1, pposy=-1):
         print(f"{wname}: posy={posy}; nextRowWindowy={nextRowWindowy}")
         nextRowWindowy = nextRowWindowy + sizey
 
-    cv.namedWindow(wname, cv.WINDOW_NORMAL); readKey(100)
+    cv.namedWindow(wname, cv.WINDOW_AUTOSIZE); readKey(100)
     print(f"{wname}: moving to posx={posx} posy={posy}")
     for qq in range(1):
         cv.moveWindow(wname, posx, posy); readKey()
@@ -183,13 +183,15 @@ def newNamedWindow(wname, psizex=320,psizey=240, pposx=-1, pposy=-1):
         nextWindowy = nextRowWindowy
         nextRowWindowy += sizey
 
-    print(f"{wname}: nextWindowx={nextWindowx} nextWindowy={nextWindowy} nextRowWindowy={nextRowWindowy}")
+    #print(f"{wname}: nextWindowx={nextWindowx} nextWindowy={nextWindowy} nextRowWindowy={nextRowWindowy}")
     return wname
 
 
-newNamedWindow('flow03', 500,300)
-newNamedWindow('flow14', 500,300)
-newNamedWindow('flowdiff',500,300)
+newNamedWindow('flow1', 400,500)
+newNamedWindow('flow2', 400,500)
+newNamedWindow('flow3', 400,500)
+newNamedWindow('flow4', 400,500)
+newNamedWindow('flowdiff',600,500)
 
 def showImage(wname, img):
     cv.imshow(wname, img)
@@ -207,50 +209,64 @@ while(cap.isOpened()):
     if not ret:
         break
 
-    flow03 = calcFlow(0,3)
-    flow14 = calcFlow(1,4)
+
+    flow1,flow1mag,flow1dir = calcFlow(0,1)
+    flow2,flow2mag,flow2dir = calcFlow(1,2)
+    flow3,flow3mag,flow3dir = calcFlow(2,3)
+    flow4,flow4mag,flow4dir = calcFlow(3,4)
+
+    #flow01mag = cv.normalize(flow01mag, None, 0.0, 0.1, cv.NORM_MINMAX, cv.CV_32F)
+    #flow12mag = cv.normalize(flow12mag, None, 0.0, 0.1, cv.NORM_MINMAX, cv.CV_32F)
+    #flowdiff = cv.UMat(np.zeros_like(flow01.get()))
+    flowdiff = cv.multiply(cv.multiply(cv.multiply(flow1mag, flow2mag), flow3mag), flow4mag)
+    flowdiff = cv.divide(flowdiff,4)
+
     if True:
-        flowdiff = cv.UMat(np.zeros_like(flow03.get()))
-        flowdiff = cv.subtract(flow03, flow14)
-        flowdiffmag, _ = cv.cartToPolar(cv.UMat(flowdiff.get()[..., 0]), cv.UMat(flowdiff.get()[..., 1]))
+        #flowdiff = cv.UMat(np.zeros_like(flow01.get()))
+        #flowdiff = cv.subtract(flow12, flow01)
+        #flowdiffmag, _ = cv.cartToPolar(cv.UMat(flowdiff.get()[..., 0]), cv.UMat(flowdiff.get()[..., 1]))
 
-        flowdiffmag = cv.normalize(flowdiffmag, None, 0, 255, cv.NORM_MINMAX, cv.CV_8UC1)
+        flowdiffmag = cv2.multiply(flowdiff , 2, dtype=cv.CV_8UC1)
+        print(flowdiffmag.get().max())
+        #cv.normalize(flowdiff, None, 0, 255, cv.NORM_MINMAX, cv.CV_8UC1)
         #cv.imwrite(f"{jpgdir}/flowdiffmag{i:04d}.jpg", flowdiffmag)
-        #cv.imwrite(f"{jpgdir}/flow03{i:04d}.jpg", flow03)
+        #cv.imwrite(f"{jpgdir}/flow01{i:04d}.jpg", flow01)
 
-        showImage('flow03', normalize(flow03mag))
-        showImage('flow14', normalize(flow14mag))
-        showImage('flowdiff', normalize(flowdiffmag))
+        showImage('flow1', flow1mag)
+        showImage('flow2', flow2mag)
+        showImage('flow3', flow3mag)
+        showImage('flow4', flow4mag)
+        showImage('flowdiff', flowdiffmag)
 
         k=getKey()
-        if (k & 0xFF) == ord('q'):
+        if (k & 0xFF) in { ord('q'), 27,3 }:
             cap.release()
             break
         if (k & 0xFF) == ord(' '):
             break
         if (k & 0xFF) == ord('s'):
-            cv.imwrite(f"{jpgdir}/flow03{i:04d}.jpg", flow03)
-            cv.imwrite(f"{jpgdir}/flow14{i:04d}.jpg", flow14)
+            cv.imwrite(f"{jpgdir}/flow01{i:04d}.jpg", flow01)
+            cv.imwrite(f"{jpgdir}/flow12{i:04d}.jpg", flow12)
             cv.imwrite(f"{jpgdir}/flowdiff{i:04d}.jpg", flowdiff)
-            cv.imwrite(f"{jpgdir}/flow03mag{i:04d}.jpg", flow03mag)
-            cv.imwrite(f"{jpgdir}/flow14mag{i:04d}.jpg", flow14mag)
+            cv.imwrite(f"{jpgdir}/flow01mag{i:04d}.jpg", flow01mag)
+            cv.imwrite(f"{jpgdir}/flow12mag{i:04d}.jpg", flow12mag)
             cv.imwrite(f"{jpgdir}/flowdiffmag{i:04d}.jpg", flowdiffmag)
             print("saved.")
 
-    flowmag = cv.normalize(flowmag, None, 0, 255, cv.NORM_MINMAX, cv.CV_8UC1)
-    cv.imwrite(f"{jpgdir}/flowmag{i:04d}.jpg", flowmag)
-    raw_frames.pop(0)
-    gray_frames.pop(0)
-    print(f"frame {i:04d}", end='\r')
-
-    continue
-
-
-    flowdiff = cv.threshold(flowdiff, 30, 255, cv.THRESH_BINARY)[1]
+    """flow01mag = cv.multiply(flow01mag, 1) #cv.normalize(flow01mag, None, 0, 255, cv.NORM_MINMAX, cv.CV_8UC1)
+    cv.imwrite(f"{jpgdir}/flow01mag{i:04d}.jpg", flow01mag)
+    flow12mag = cv.multiply(flow12mag, 1) #cv.normalize(flow12mag, None, 0, 255, cv.NORM_MINMAX, cv.CV_8UC1)
+    cv.imwrite(f"{jpgdir}/flow12mag{i:04d}.jpg", flow12mag)
+    flowdiffmag = cv.multiply(flowdiffmag, 1) #cv.normalize(flowdiffmag, None, 0, 255, cv.NORM_MINMAX, cv.CV_8UC1)
+    cv.imwrite(f"{jpgdir}/flowdiffmag{i:04d}.jpg", flowdiffmag)"""
 
 
-    graymask_main = prep_graymask(calcFlow(2,4))
-    graymask_comp = prep_graymask(calcFlow(1,3))
+
+    graymask_main = cv.threshold(flowdiffmag, 30, 255, cv.THRESH_BINARY)[1]
+
+
+    #graymask_main = prep_graymask(calcFlow(2,4))
+    #graymask_comp = prep_graymask(calcFlow(1,3))
     conts, heirarchy = cv.findContours(graymask_main, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
 
     #print(len(conts))
@@ -266,15 +282,15 @@ while(cap.isOpened()):
 
     for j in range(len(conts)):
         cont = conts[j].get()
-
-        blank = np.zeros_like(graymask_main.get()).astype(np.uint8)
-        cv.drawContours(blank, [cont], -1, 1, cv.FILLED)
-        pixelcount = cv.countNonZero(blank)
-        blank = cv.multiply(blank, graymask_comp)
-        pixelcountafter = cv.countNonZero(blank)
-        print(f"[{pixelcountafter}:{pixelcount}]")
-        if pixelcountafter < pixelcount*0.3:
-            continue
+        if False: # comparison with previous flow, disabled for now
+            blank = np.zeros_like(graymask_main.get()).astype(np.uint8)
+            cv.drawContours(blank, [cont], -1, 1, cv.FILLED)
+            pixelcount = cv.countNonZero(blank)
+            blank = cv.multiply(blank, graymask_comp)
+            pixelcountafter = cv.countNonZero(blank)
+            print(f"[{pixelcountafter}:{pixelcount}]")
+            if pixelcountafter < pixelcount*0.3:
+                continue
         x,y,w,h = cv.boundingRect(cont)
         blob = raw_frames[PICTURE_FRAME].get()[y:y+h,x:x+w].copy()
         area = cv.contourArea(cont)
@@ -362,7 +378,7 @@ while(cap.isOpened()):
         for k in range(ANALYSIS_FRAME_COUNT):
             cv.imwrite(f"{jpgdir}/sfr{i:04d}_c{j:04d}_sf{k}.jpg", subframes[k])
 
-        os.system(f'/bin/bash -c \'cat {jpgdir}/sfr{i:04d}_c{j:04d}_sf{{0,1,2,3,4,4,4}}.jpg\' | ffmpeg -v 0 -y -f jpeg_pipe -r 5 -i -  -vf "scale=iw:ih,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse"     {contsdir}/sfr{i:04d}_c{j:04d}_sfs.gif')
+        os.system(f'/bin/bash -c \'cat {jpgdir}/sfr{i:04d}_c{j:04d}_sf{{0,1,2,3,4,2,2,2,2}}.jpg\' | ffmpeg -v 0 -y -f jpeg_pipe -r 5 -i -  -vf "scale=iw:ih,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse"     {contsdir}/sfr{i:04d}_c{j:04d}_sfs.gif')
         # create sqlite record
         cv.imwrite(f"{contsdir}/sfr{i:04d}_c{j:04d}_sfBLOB.jpg", blob)
         blob = open(f"{contsdir}/sfr{i:04d}_c{j:04d}_sfBLOB.jpg", 'rb').read()
@@ -377,12 +393,12 @@ while(cap.isOpened()):
 
 
     cv.imwrite(f"{jpgdir}/graymask{i:04d}.jpg", graymask_main)
-    cv.imwrite(f"{jpgdir}/graycomp{i:04d}.jpg", graymask_comp)
+    #cv.imwrite(f"{jpgdir}/graycomp{i:04d}.jpg", graymask_comp)
     cv.imwrite(f"{jpgdir}/frame{i:04d}.jpg",this_frame)
-    i=i+1
     # Updates previous frame 
 
 
+    i += 1
     raw_frames.pop(0)
     gray_frames.pop(0)
     print(f"frame {i:04d}", end='\r')

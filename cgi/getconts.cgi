@@ -13,8 +13,9 @@ cgitb.enable()
 
 print("Content-Type: application/json; charset=utf-8")
 print()
-
-conn = sqlite3.connect('/home/tomh/slbetrain/samples.sqlite3')
+conn = sqlite3.connect('/home/tomh/slbetrain/slbeuser_tomh.sqlite3')
+conn.execute('CREATE TABLE IF NOT EXISTS slbeuser_tomh (recid INTEGER PRIMARY KEY, user TEXT, choice TEXT)')
+conn.execute("attach  '/home/tomh/slbetrain/samples.sqlite3' as samples")
 conn.enable_load_extension(True)
 conn.load_extension("/home/tomh/slbetrain/sqlean/dist/sqlean.so")
 conn.row_factory = sqlite3.Row
@@ -32,8 +33,8 @@ c.execute('''SELECT s.recid,s.sourcemedia_base, s.frame_no, s.contour_id, s.x,s.
             encode(s.image,'base64') image, 
             encode(s.still_context,'base64') still_context, 
             encode(s.animated_context,'base64') animated_context
-        FROM samples s
-        LEFT JOIN useractivity u ON s.recid=u.recid
+        FROM samples.samples s
+        LEFT JOIN slbeuser_tomh u ON s.recid=u.recid
         WHERE u.recid IS NULL LIMIT 80
         ''', ())
 

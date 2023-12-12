@@ -158,7 +158,7 @@ function updateBody() {
 			console.log(data);
 			jdata = data.responseJSON;
 			window._x_maxAt = jdata.length;
-			for (var i=window._x_startAt; i<Math.min(jdata.length,window._x_startAt+PAGESIZE); i++) {
+			for (var i=window._x_startAt*0; i<Math.min(jdata.length,window._x_startAt*0+PAGESIZE); i++) {
 				var d=bdy.appendChild(document.createElement("div"));
 				d.classList.add("trainbox");
 				d.setAttribute("data-recid",jdata[i]['recid']);

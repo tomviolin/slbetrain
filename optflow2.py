@@ -12,10 +12,11 @@ import sqlite3
 import time
 import datetime
 
-OF_DATESTAMP=os.environ['OF_DATESTAMP']
+#OF_DATESTAMP=os.environ['OF_DATESTAMP']
 MAX_SAMPLE_DIM = 256
 ANALYSIS_FRAME_COUNT = 5
 PICTURE_FRAME = 2
+WINDOW_SIZE = 0
 conn = sqlite3.connect('samples.sqlite3')
 conn.execute('''CREATE TABLE IF NOT EXISTS samples (
         recid INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -130,12 +131,16 @@ keyq = []
 # readKey() allows the GUI to update, and queues any keypress events
 # so they can be checked at the end of the display loop
 def readKey(n=1):
+    if WINDOW_SIZE <= 0:
+        return
     global keyq
     k = cv.waitKey(n)
     if k != -1:
         keyq.append(k)
 
 def getKey():
+    if WINDOW_SIZE <= 0:
+        return
     readKey()
     global keyq
     if len(keyq) > 0:
@@ -144,7 +149,9 @@ def getKey():
         return -1
 
 
-def newNamedWindow(wname, psizex=320,psizey=240, pposx=-1, pposy=-1):
+def newNamedWindow(wname, psizex=WINDOW_SIZE,psizey=int(WINDOW_SIZE*1080/1920), pposx=-1, pposy=-1):
+    if WINDOW_SIZE <= 0:
+        return
     sizex=psizex
     sizey=psizey
     global nextWindowx, nextWindowy, nextRowWindowy
@@ -167,7 +174,7 @@ def newNamedWindow(wname, psizex=320,psizey=240, pposx=-1, pposy=-1):
         print(f"{wname}: posy={posy}; nextRowWindowy={nextRowWindowy}")
         nextRowWindowy = nextRowWindowy + sizey
 
-    cv.namedWindow(wname, cv.WINDOW_AUTOSIZE); readKey(100)
+    cv.namedWindow(wname, cv.WINDOW_NORMAL); readKey(100)
     print(f"{wname}: moving to posx={posx} posy={posy}")
     for qq in range(1):
         cv.moveWindow(wname, posx, posy); readKey()
@@ -194,6 +201,8 @@ newNamedWindow('flow4', 400,500)
 newNamedWindow('flowdiff',600,500)
 
 def showImage(wname, img):
+    if WINDOW_SIZE <= 0:
+        return
     cv.imshow(wname, img)
     readKey()
 
@@ -237,21 +246,21 @@ while(cap.isOpened()):
         showImage('flow3', flow3mag)
         showImage('flow4', flow4mag)
         showImage('flowdiff', flowdiffmag)
-
-        k=getKey()
-        if (k & 0xFF) in { ord('q'), 27,3 }:
-            cap.release()
-            break
-        if (k & 0xFF) == ord(' '):
-            break
-        if (k & 0xFF) == ord('s'):
-            cv.imwrite(f"{jpgdir}/flow01{i:04d}.jpg", flow01)
-            cv.imwrite(f"{jpgdir}/flow12{i:04d}.jpg", flow12)
-            cv.imwrite(f"{jpgdir}/flowdiff{i:04d}.jpg", flowdiff)
-            cv.imwrite(f"{jpgdir}/flow01mag{i:04d}.jpg", flow01mag)
-            cv.imwrite(f"{jpgdir}/flow12mag{i:04d}.jpg", flow12mag)
-            cv.imwrite(f"{jpgdir}/flowdiffmag{i:04d}.jpg", flowdiffmag)
-            print("saved.")
+        if WINDOW_SIZE > 0:
+            k=getKey()
+            if (k & 0xFF) in { ord('q'), 27,3 }:
+                cap.release()
+                break
+            if (k & 0xFF) == ord(' '):
+                break
+            if (k & 0xFF) == ord('s'):
+                cv.imwrite(f"{jpgdir}/flow01{i:04d}.jpg", flow01)
+                cv.imwrite(f"{jpgdir}/flow12{i:04d}.jpg", flow12)
+                cv.imwrite(f"{jpgdir}/flowdiff{i:04d}.jpg", flowdiff)
+                cv.imwrite(f"{jpgdir}/flow01mag{i:04d}.jpg", flow01mag)
+                cv.imwrite(f"{jpgdir}/flow12mag{i:04d}.jpg", flow12mag)
+                cv.imwrite(f"{jpgdir}/flowdiffmag{i:04d}.jpg", flowdiffmag)
+                print("saved.")
 
     """flow01mag = cv.multiply(flow01mag, 1) #cv.normalize(flow01mag, None, 0, 255, cv.NORM_MINMAX, cv.CV_8UC1)
     cv.imwrite(f"{jpgdir}/flow01mag{i:04d}.jpg", flow01mag)

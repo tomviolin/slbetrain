@@ -33,7 +33,10 @@ if recid == "" or choice == "":
 
 
 conn = sqlite3.connect('/home/tomh/slbetrain/slbeuser_tomh.sqlite3')
+conn.row_factory = sqlite3.Row
+conn.execute('CREATE TABLE IF NOT EXISTS slbeuser_tomh (recid INTEGER PRIMARY KEY, user TEXT, choice TEXT)')
 c = conn.cursor()
+
 c.execute('''
     INSERT INTO slbeuser_tomh
        (recid, user, choice) VALUES (?,?,?)''', (recid, user, choice))

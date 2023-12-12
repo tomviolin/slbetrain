@@ -1,5 +1,5 @@
 
-const PAGESIZE = 8;
+const PAGESIZE = 80;
 
 // check if SSL is enabled; if not, redirect to SSL
 if (window.location.protocol != "https:") {
@@ -100,30 +100,42 @@ function chose(recid, yesno) {
 			}
 		});
 	});
-	console.log("completed the animation");
-	console.log("sending user choice");
-	$.ajax({
-		url: "/slbetrain/cgi-bin/user_chose.cgi?recid="+recid+"&user="+user+"&choice="+yesno,
-		complete: function(data) {
-			window.setTimeout(function() {
-				console.log("completed the processing of user choice");
-				console.log(data);
-				console.log("removing "+recid);
-				var targ_trainbox = $("div.trainbox[data-recid="+recid+"]")[0];
-				$(targ_trainbox).remove();
-				console.log("removed "+recid);
-			}, 800);
-				//updateBody();
-		}
-	});
 }
 
 
+// read "user" cookie
+function readCookie(name) {
+    var allcookies = document.cookie;
+    console.log("All Cookies : " + allcookies );
+    // Get all the cookies pairs in an array
+    cookiearray = allcookies.split(';');
+    // Now take key value pair out of this array
+    for(var i=0; i<cookiearray.length; i++) {
+        cname = cookiearray[i].split('=')[0];
+        cvalue = cookiearray[i].split('=')[1];
+        console.log ("Key is : " + cname + " and Value is : " + cvalue);
+	if (cname == name) {
+		return cvalue;
+	}
+
+    }
+}
 
 window._x_startAt = 0;
 window._x_maxAt = 0;
 function updateBody() {
-
+	//user = readCookie('authuser');
+	if (false) { // (user == null) {
+		// show login page
+		$("div#login")[0].style.display = "block";
+		$("div#root")[0].style.display = "none";
+		$("div#login")[0].style.opacity = 1;
+		$("div#login")[0].style.zIndex = 1;
+		$("div#login")[0].style.position = "relative";
+		$("div#login")[0].style.top = 0;
+		$("div#login")[0].style.left = 0;
+		return;
+	}
 	bdy = $("div#root")[0];
 	bdy.innerHTML = "";
 	headline = bdy.appendChild(document.createElement("p"));
@@ -187,20 +199,4 @@ function updateBody() {
 	updateBody();
 
 })();
-
-
-
-
-
-
-                
-
-
-
-
-
-
-
-
-
 

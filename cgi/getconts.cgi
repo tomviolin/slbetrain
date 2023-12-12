@@ -34,7 +34,7 @@ c.execute('''SELECT s.recid,s.sourcemedia_base, s.frame_no, s.contour_id, s.x,s.
             encode(s.animated_context,'base64') animated_context
         FROM samples s
         LEFT JOIN useractivity u ON s.recid=u.recid
-        WHERE u.recid IS NULL LIMIT 8
+        WHERE u.recid IS NULL LIMIT 80
         ''', ())
 
 rows = c.fetchall()

@@ -209,7 +209,7 @@ while(cap.isOpened()):
 
     flow03 = calcFlow(0,3)
     flow14 = calcFlow(1,4)
-
+    if True:
         flowdiff = cv.UMat(np.zeros_like(flow03.get()))
         flowdiff = cv.subtract(flow03, flow14)
         flowdiffmag, _ = cv.cartToPolar(cv.UMat(flowdiff.get()[..., 0]), cv.UMat(flowdiff.get()[..., 1]))
